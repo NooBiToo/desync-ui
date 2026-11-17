@@ -65,6 +65,7 @@ local function setup(opts)
   C_Secrets = { CanCompareUnitTokens = function() return canCompare end }
   IsInInstance = function() return false end
   UnitThreatSituation = function() return nil end
+  UnitDetailedThreatSituation = nil
   issecretvalue = function(v) return v == SECRET end
   UnitExists = function(u)
     if u:find("^nameplate%d+$") then
@@ -314,6 +315,25 @@ test("inside a dungeon the counter works from threat: members in combat, shield 
   canCompare, plateLookup, guidOpen = true, true, true
   fire("PLAYER_ENTERING_WORLD"); flush()
   assert(visible(1) and w(1).count.text == 2 and not w(1).alert.shown)
+end)
+
+test("in a dungeon pack the number sits only on the mob the group actually hits", function()
+  IsInInstance = function() return true, "party" end
+  canCompare, plateLookup, guidOpen = false, false, false
+  -- everyone is listed on both mobs; only nameplate1 gets real threat (single-target)
+  local value = { nameplate1 = { player = 700, party1 = 5000, party2 = 900 }, nameplate2 = { party1 = 0, player = 0, party2 = 0 } }
+  UnitThreatSituation = function(u, mob)
+    if mob == "nameplate1" then return u == "party1" and 3 or 0 end
+    if mob == "nameplate2" then return u == "party1" and 3 or 0 end
+  end
+  UnitDetailedThreatSituation = function(u, mob)
+    local v = value[mob] and value[mob][u]
+    return u == "party1", UnitThreatSituation(u, mob), 0, 0, v
+  end
+  fire("UNIT_THREAT_LIST_UPDATE", "nameplate1"); flush()
+  assert(w(1).count.text == 3, "hit mob: " .. tostring(w(1).count.text))
+  assert(not w(2).sword.shown, "untouched mob must show no number")
+  assert(w(2).tank.shown)  -- still on the tank (it pulled the pack)
 end)
 
 test("threat changes on mobs and group members trigger a redraw; other units do not", function()

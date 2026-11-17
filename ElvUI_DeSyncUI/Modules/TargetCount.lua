@@ -205,10 +205,16 @@ local function inInstance()
 end
 
 -- threat situation 0..3 of a member on a mob, nil when not on its threat table (or hidden by the game)
+-- status plus the raw threat value; the value is nil when the game hides it (then CountThreat counts the status)
 local function threatOf(unit, mob)
   local s = UnitThreatSituation and UnitThreatSituation(unit, mob)
-  if isSecret(s) then return nil end
-  return s
+  if s == nil or isSecret(s) then return nil end
+  local v
+  if UnitDetailedThreatSituation then
+    v = select(5, UnitDetailedThreatSituation(unit, mob))
+    if isSecret(v) or type(v) ~= "number" then v = nil end
+  end
+  return s, v
 end
 
 function mod.Update()

@@ -82,6 +82,25 @@ test("CountThreat: status 2 (tanking, about to lose it) still counts as holding"
   assert(res.nameplate1.tank and not res.nameplate1.loose)
 end)
 
+test("CountThreat: only members with threat on that mob count (the whole pack lists everyone at zero)", function()
+  -- {status, value}: the player and party2 are listed on nameplate2 with zero threat, they never hit it
+  local t = {
+    nameplate1 = { player = { 0, 800 }, party1 = { 3, 5000 }, party2 = { 1, 1200 } },
+    nameplate2 = { player = { 0, 0 }, party1 = { 3, 900 }, party2 = { 0, 0 } },
+  }
+  local res = T.CountThreat({ "nameplate1", "nameplate2" },
+    { { unit = "player" }, { unit = "party1", tank = true }, { unit = "party2" } },
+    function(u, mob) local e = t[mob] and t[mob][u]; if e then return e[1], e[2] end end)
+  assert(res.nameplate1.count == 3 and res.nameplate1.tank)
+  assert(res.nameplate2.count == 1 and res.nameplate2.tank, "zero-threat members must not count: " .. res.nameplate2.count)
+end)
+
+test("CountThreat: when the game hides the threat value, being on the table counts", function()
+  local res = T.CountThreat({ "nameplate1" }, { { unit = "player" }, { unit = "party1", tank = true } },
+    function(u) if u == "party1" then return 3, nil end return 0, nil end)
+  assert(res.nameplate1.count == 2)
+end)
+
 test("CountThreat: without a known tank nobody is flagged as loose", function()
   local res = T.CountThreat({ "nameplate1" }, { { unit = "player" }, { unit = "party1" } },
     threatFrom({ nameplate1 = { player = 3, party1 = 0 } }))

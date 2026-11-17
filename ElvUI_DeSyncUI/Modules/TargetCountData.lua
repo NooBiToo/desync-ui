@@ -34,8 +34,10 @@ function T.Count(plates, members, locate)
 end
 
 -- Dungeons hide every target but keep threat readable (seen in game), so there the counter works from threat.
--- threat(unit, mob) -> threat situation 0..3, or nil when the member is not on the mob's threat table.
--- count = members on its threat table (fighting it), tank = the tank holds it (2 or 3),
+-- threat(unit, mob) -> status 0..3 (nil when not on the mob's threat table), value (raw threat; nil when hidden).
+-- In combat the game lists every group member on every mob of the pack with zero threat (seen in game),
+-- so count = members with threat value > 0 on that mob (they hit or healed against it); when the value is
+-- hidden, being on the table counts. tank = the tank holds it (2 or 3),
 -- loose = someone else holds it; only when the group has a known tank.
 -- returns { [plate] = { count, tank, loose } }
 function T.CountThreat(plates, members, threat)
@@ -44,9 +46,9 @@ function T.CountThreat(plates, members, threat)
   for _, p in ipairs(plates) do
     local count, holder, best = 0, nil, 1
     for _, m in ipairs(members) do
-      local s = threat(m.unit, p)
+      local s, value = threat(m.unit, p)
       if s then
-        count = count + 1
+        if value == nil or value > 0 then count = count + 1 end
         if s > best then holder, best = m, s end
       end
     end
