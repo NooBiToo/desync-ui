@@ -287,6 +287,17 @@ test("/dstwho reports each step of the chain", function()
   assert(saidHas("party1") and saidHas("nameplate2") and saidHas("иконки показаны: 2"))
 end)
 
+test("/dstwho shows each way of finding a target separately, and whether we are in an instance", function()
+  IsInInstance = function() return true, "party" end
+  C_Secrets.ShouldUnitIdentityBeSecret = function() return true end
+  plateLookup, guidOpen = false, false
+  SlashCmdList.DSTWHO("")
+  local r = table.concat(moddb.lastReport, "\n")
+  assert(r:find("подземелье: да (party)", 1, true), r)
+  assert(r:find("индикатор цели: нет", 1, true) and r:find("GUID: скрыт", 1, true))
+  assert(r:find("сравнение: да", 1, true) and r:find("личность скрыта: да", 1, true))
+end)
+
 test("/dstwho also saves its report with the settings", function()
   SlashCmdList.DSTWHO("")
   local r = moddb.lastReport

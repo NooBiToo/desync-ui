@@ -267,20 +267,27 @@ local function report()
   end
   local inRaid = IsInRaid()
   local list, anyTank = members()
-  say(string.format("в группе: %s, рейд: %s, участников: %d, танк найден: %s, тест: %s",
-    yn(IsInGroup()), yn(inRaid), #list, yn(anyTank), yn(testMode)))
-  local all, hostile, noFrame, shown, tokens = 0, 0, 0, 0, {}
+  local inInstance, instanceType = false, nil
+  if IsInInstance then inInstance, instanceType = IsInInstance() end
+  say(string.format("в группе: %s, рейд: %s, участников: %d, танк найден: %s, тест: %s, подземелье: %s%s",
+    yn(IsInGroup()), yn(inRaid), #list, yn(anyTank), yn(testMode), yn(inInstance),
+    instanceType and not isSecret(instanceType) and (" (" .. instanceType .. ")") or ""))
+  local secrets = C_Secrets or {}
+  local all, hostile, noFrame, shown, hiddenFoe, tokens = 0, 0, 0, 0, 0, {}
   for _, e in ipairs(currentPlates()) do
     all = all + 1
     local uf, unit = e.plate.unitFrame, e.unit
     if not (uf and uf.Health) then
       noFrame = noFrame + 1
     else
-      if notSecret(UnitCanAttack("player", unit)) then hostile = hostile + 1; tokens[#tokens + 1] = unit end
+      local foe = UnitCanAttack("player", unit)
+      if isSecret(foe) then hiddenFoe = hiddenFoe + 1 end
+      if notSecret(foe) then hostile = hostile + 1; tokens[#tokens + 1] = unit end
       if uf.dstTC and uf.dstTC:IsShown() then shown = shown + 1 end
     end
   end
-  say(string.format("индикаторов: %d (вражеских: %d, без рамки ElvUI: %d)", all, hostile, noFrame))
+  say(string.format("индикаторов: %d (вражеских: %d, «враг ли» скрыто игрой: %d, без рамки ElvUI: %d)",
+    all, hostile, hiddenFoe, noFrame))
   local locate = makeLocate(tokens)
   for i, m in ipairs(list) do
     if i > 5 then break end
@@ -288,6 +295,15 @@ local function report()
     local p, refused, how = locate(target)
     say(string.format("  %s%s: цель есть: %s, найдена: %s, совпадает с: %s", m.unit, m.tank and " (танк)" or "",
       yn(UnitExists(target)), how, refused and "—" or (p or "нет")))
+    -- each way on its own: which one the game closes here
+    local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, target)
+    local guid = UnitGUID and UnitGUID(target)
+    local cmp = secrets.CanCompareUnitTokens and tokens[1] and secrets.CanCompareUnitTokens(target, tokens[1])
+    local hidden = secrets.ShouldUnitIdentityBeSecret and secrets.ShouldUnitIdentityBeSecret(target)
+    say(string.format("    индикатор цели: %s, GUID: %s, сравнение: %s, личность скрыта: %s",
+      not ok and "ошибка" or (plate and "есть" or "нет"),
+      isSecret(guid) and "скрыт" or (guid and "есть" or "нет"),
+      tokens[1] and yn(cmp) or "нет врагов", yn(hidden)))
   end
   say(string.format("иконки показаны: %d%s", shown, lastError and (", последняя ошибка: " .. lastError) or ""))
 end
