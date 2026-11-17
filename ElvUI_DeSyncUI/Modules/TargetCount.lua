@@ -3,7 +3,8 @@ local mod = ns.NewModule("TargetCount", {
   title = "Кто кого бьёт",
   desc = "В группе и рейде на индикаторах здоровья врагов (ElvUI) слева от полоски видно: "
       .. "меч с числом — сколько участников держат этого врага в цели (вы тоже считаетесь), "
-      .. "щит — этого врага держит в цели танк. Танк — участник с ролью «Танк» или главный танк рейда.",
+      .. "щит — этого врага держит в цели танк. Танк — участник с ролью «Танк» или главный танк рейда. "
+      .. "Работает в открытом мире: в подземельях Forever игра скрывает от аддонов, кто кого выбрал в цель.",
 })
 
 local say = ns.say
@@ -12,6 +13,7 @@ local SIZE = 16
 
 local E, DB
 local pending, reported, warnedHidden, warnedNoTank = false, false, false, false
+local closedHere, warnedInstance = false, false  -- inside a dungeon that hides targets
 local testMode, lastError = false, nil
 
 local function safe(fn, ...)
@@ -186,7 +188,14 @@ local function makeLocate(tokens)
   end
 end
 
+local function inInstance()
+  if not IsInInstance then return false end
+  local inside = IsInInstance()
+  return notSecret(inside) and inside and true or false
+end
+
 function mod.Update()
+  if closedHere and not testMode then return end  -- this dungeon hides every target: nothing to count
   local inGroup = IsInGroup() or testMode
   local tokens, frames = {}, {}
   for _, e in ipairs(currentPlates()) do
@@ -213,6 +222,18 @@ function mod.Update()
     say("TargetCount: в группе никто не отмечен танком (роль «Танк» или главный танк рейда), щит не показывается")
   end
   local res, blocked = T.Count(tokens, list, makeLocate(tokens))
+  if blocked and inInstance() then
+    -- seen in game: inside Forever dungeons every member's target is secret (plate lookup, GUID and
+    -- comparison all refused), so stop until the next zone change instead of recounting on every event
+    closedHere = true
+    for _, uf in pairs(frames) do hide(uf) end
+    if not warnedInstance then
+      warnedInstance = true
+      say("TargetCount: в подземельях Forever игра скрывает от аддонов, кто кого выбрал в цель, — "
+        .. "здесь счётчик не работает (в открытом мире работает)")
+    end
+    return
+  end
   if blocked and not warnedHidden then
     warnedHidden = true
     say("TargetCount: игра скрывает цели участников группы, часть иконок не показывается")
@@ -242,6 +263,7 @@ local function onEvent(_, event, unit)
     local plate = plateFor(unit)  -- the frame gets reused for another unit: drop our icons now
     if plate and plate.unitFrame then hide(plate.unitFrame) end
   elseif event == "PLAYER_ENTERING_WORLD" then
+    closedHere = false  -- a new zone: maybe the open world again
     seed()
   end
   if event == "UNIT_TARGET" and not groupUnit(unit) then return end  -- mobs retarget all the time

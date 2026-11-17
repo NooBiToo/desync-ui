@@ -63,6 +63,7 @@ local function setup(opts)
   UnitGroupRolesAssigned = function(u) return roles[u] or "NONE" end
   GetPartyAssignment = function() return false end
   C_Secrets = { CanCompareUnitTokens = function() return canCompare end }
+  IsInInstance = function() return false end
   issecretvalue = function(v) return v == SECRET end
   UnitExists = function(u)
     if u:find("^nameplate%d+$") then
@@ -285,6 +286,26 @@ test("/dstwho reports each step of the chain", function()
   SlashCmdList.DSTWHO("")
   assert(saidHas("в группе: да") and saidHas("индикаторов: 3") and saidHas("вражеских: 2"))
   assert(saidHas("party1") and saidHas("nameplate2") and saidHas("иконки показаны: 2"))
+end)
+
+test("inside a dungeon where the game hides every target: one clear message, no icons, no work until leaving", function()
+  IsInInstance = function() return true, "party" end
+  canCompare, plateLookup, guidOpen = false, false, false
+  fire("UNIT_TARGET", "party1"); flush()
+  assert(saidHas("подземельях") and not visible(1) and not visible(2))
+  local calls = 0
+  local compare = C_Secrets.CanCompareUnitTokens
+  C_Secrets.CanCompareUnitTokens = function(...) calls = calls + 1; return compare(...) end
+  fire("UNIT_TARGET", "party2"); flush()
+  assert(calls == 0, "kept working inside the dungeon: " .. calls)
+  local n = 0
+  for _, s in ipairs(said) do if s:find("подземельях", 1, true) then n = n + 1 end end
+  assert(n == 1)
+  -- back in the open world everything works again
+  IsInInstance = function() return false end
+  canCompare, plateLookup, guidOpen = true, true, true
+  fire("PLAYER_ENTERING_WORLD"); flush()
+  assert(visible(1) and w(1).count.text == 2)
 end)
 
 test("/dstwho shows each way of finding a target separately, and whether we are in an instance", function()
