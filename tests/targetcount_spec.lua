@@ -319,6 +319,28 @@ test("/dstwho shows each way of finding a target separately, and whether we are 
   assert(r:find("сравнение: да", 1, true) and r:find("личность скрыта: да", 1, true))
 end)
 
+test("/dstwho shows whom each enemy targets (the mob's target) and the tank's threat on it", function()
+  local mobTargets = { nameplate1 = "party1", nameplate2 = "party2" }
+  local base = UnitIsUnit
+  UnitIsUnit = function(a, b)
+    local mob = a:match("^(nameplate%d+)target$")
+    if mob then return mobTargets[mob] == b end
+    return base(a, b)
+  end
+  local exists = UnitExists
+  UnitExists = function(u)
+    local mob = u:match("^(nameplate%d+)target$")
+    if mob then return mobTargets[mob] ~= nil end
+    return exists(u)
+  end
+  UnitThreatSituation = function(u, mob) if u == "party1" and mob == "nameplate1" then return 3 end return 0 end
+  SlashCmdList.DSTWHO("")
+  local r = table.concat(moddb.lastReport, "\n")
+  assert(r:find("nameplate1: цель моба есть: да, на ком: party1 (танк)", 1, true), r)
+  assert(r:find("угроза танка: 3", 1, true), r)
+  assert(r:find("nameplate2: цель моба есть: да, на ком: party2", 1, true), r)
+end)
+
 test("/dstwho also saves its report with the settings", function()
   SlashCmdList.DSTWHO("")
   local r = moddb.lastReport

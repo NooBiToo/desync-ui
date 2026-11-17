@@ -327,6 +327,22 @@ local function report()
       isSecret(guid) and "скрыт" or (guid and "есть" or "нет"),
       tokens[1] and yn(cmp) or "нет врагов", yn(hidden)))
   end
+  -- the other direction: whom each enemy targets, and the tank's threat on it (may stay open in dungeons)
+  local tank
+  for _, m in ipairs(list) do if m.tank then tank = tank or m.unit end end
+  for i, mob in ipairs(tokens) do
+    if i > 5 then break end
+    local mt = mob .. "target"
+    local on = "никто"
+    for _, m in ipairs(list) do
+      local r = same(mt, m.unit)
+      if r == nil then on = "сравнение запрещено игрой"; break end
+      if r then on = m.unit .. (m.tank and " (танк)" or ""); break end
+    end
+    local threat = tank and UnitThreatSituation and UnitThreatSituation(tank, mob)
+    say(string.format("  %s: цель моба есть: %s, на ком: %s, угроза танка: %s", mob, yn(UnitExists(mt)), on,
+      not tank and "нет танка" or (isSecret(threat) and "скрыта" or tostring(threat))))
+  end
   say(string.format("иконки показаны: %d%s", shown, lastError and (", последняя ошибка: " .. lastError) or ""))
 end
 
