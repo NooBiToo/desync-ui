@@ -79,7 +79,7 @@ python -m venv .venv
 Новая версия выходит по метке git: GitHub Actions (`.github/workflows/release.yml`) прогоняет тесты, собирает архив с проверкой на личные данные, загружает его на CurseForge (`tools/curseforge_upload.py`) и прикладывает к релизу на GitHub.
 
 Один раз:
-1. Токен CurseForge: [authors.curseforge.com → API Tokens](https://authors.curseforge.com/account/api-tokens). В репозитории GitHub: Settings → Secrets and variables → Actions → секрет `CF_API_KEY` (или `gh secret set CF_API_KEY`).
+1. Токен CurseForge: [Authors Console → Settings → API Tokens](https://authors.curseforge.com/#/settings/api-tokens). В репозитории GitHub: Settings → Secrets and variables → Actions → секрет `CF_API_KEY` (или `gh secret set CF_API_KEY`).
 2. Номер проекта CurseForge — строкой `## X-Curse-Project-ID: <номер>` в `ElvUI_DeSyncUI/ElvUI_DeSyncUI.toc`.
 3. На CurseForge во вкладке Source выключить Automatic Packaging, чтобы версия не загружалась дважды.
 
