@@ -2,7 +2,7 @@
 ## Title: DeSync UI
 ## Notes: Сборка интерфейса на ElvUI с WindTools и mMediaTag и полезными модулями
 ## Author: DeSync
-## Version: 1.0.1
+## Version: 1.0.2
 ## RequiredDeps: ElvUI, ElvUI_WindTools, ElvUI_mMediaTag
 ## OptionalDeps: Questie, LibDBIcon-1.0
 ## SavedVariables: DeSyncToolsDB
