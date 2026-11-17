@@ -359,6 +359,15 @@ local function report()
     local threat = tank and UnitThreatSituation and UnitThreatSituation(tank, mob)
     say(string.format("  %s: цель моба есть: %s, на ком: %s, угроза танка: %s", mob, yn(UnitExists(mt)), on,
       not tank and "нет танка" or (isSecret(threat) and "скрыта" or tostring(threat))))
+    -- each member's threat on this mob: status (0..3) and the raw threat value (0 = only listed, never hit it)
+    local parts = {}
+    for _, m in ipairs(list) do
+      local s = UnitThreatSituation and UnitThreatSituation(m.unit, mob)
+      local v = UnitDetailedThreatSituation and select(5, UnitDetailedThreatSituation(m.unit, mob))
+      parts[#parts + 1] = string.format("%s s=%s v=%s", m.unit,
+        isSecret(s) and "скрыто" or tostring(s), isSecret(v) and "скрыто" or tostring(v))
+    end
+    say("    угроза: " .. table.concat(parts, " | "))
   end
   say(string.format("иконки показаны: %d%s", shown, lastError and (", последняя ошибка: " .. lastError) or ""))
 end

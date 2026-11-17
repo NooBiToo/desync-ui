@@ -349,8 +349,16 @@ test("/dstwho shows whom each enemy targets (the mob's target) and the tank's th
     return exists(u)
   end
   UnitThreatSituation = function(u, mob) if u == "party1" and mob == "nameplate1" then return 3 end return 0 end
+  -- isTanking, status, scaledPercent, rawPercent, threatValue
+  UnitDetailedThreatSituation = function(u, mob)
+    if mob == "nameplate1" and u == "party1" then return true, 3, 100, 100, 5000 end
+    if mob == "nameplate1" and u == "player" then return false, 0, 0, 0, 0 end
+    if mob == "nameplate2" and u == "party2" then return false, 0, 40, 40, SECRET end
+  end
   SlashCmdList.DSTWHO("")
   local r = table.concat(moddb.lastReport, "\n")
+  assert(r:find("party1 s=3 v=5000", 1, true) and r:find("player s=0 v=0", 1, true), r)
+  assert(r:find("party2 s=0 v=скрыто", 1, true), r)
   assert(r:find("nameplate1: цель моба есть: да, на ком: party1 (танк)", 1, true), r)
   assert(r:find("угроза танка: 3", 1, true), r)
   assert(r:find("nameplate2: цель моба есть: да, на ком: party2", 1, true), r)
