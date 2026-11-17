@@ -2,9 +2,15 @@ name: Release to CurseForge
 
 # Push a tag like v1.0.1 (it must equal "## Version" in ElvUI_DeSyncUI/ElvUI_DeSyncUI.toc):
 # tests run, the zip is built with the personal-data check, and the file is uploaded to CurseForge.
+# "Run workflow" (workflow_dispatch) republishes an existing tag with the current tools, e.g. after a failed upload.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish, e.g. v1.0.0"
+        required: true
 
 permissions:
   contents: write
@@ -12,6 +18,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,9 +41,9 @@ jobs:
       - name: Upload to CurseForge
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
-        run: python tools/curseforge_upload.py --tag "${GITHUB_REF_NAME}"
+        run: python tools/curseforge_upload.py --tag "$TAG"
 
       - name: GitHub release with the same zip
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" dist/ElvUI_DeSyncUI-*.zip --title "DeSync UI ${GITHUB_REF_NAME#v}" --generate-notes
+        run: gh release create "$TAG" dist/ElvUI_DeSyncUI-*.zip --title "DeSync UI ${TAG#v}" --generate-notes

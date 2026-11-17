@@ -14,6 +14,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 import uuid
 
@@ -80,8 +81,13 @@ def api(path: str, token: str, body: bytes = None, content_type: str = None):
     req = urllib.request.Request(API + path, data=body, headers={"X-Api-Token": token})
     if content_type:
         req.add_header("Content-Type", content_type)
-    with urllib.request.urlopen(req, timeout=120) as r:
-        return json.loads(r.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        # CurseForge explains a refusal in the response body: show it
+        detail = e.read().decode("utf-8", errors="replace")
+        sys.exit(f"ERROR: CurseForge {path} answered {e.code} {e.reason}: {detail}")
 
 
 def multipart(metadata: dict, file: pathlib.Path):
@@ -121,8 +127,13 @@ def main() -> int:
     token = os.environ.get("CF_API_KEY")
     if not token:
         sys.exit("ERROR: CF_API_KEY is not set (GitHub secret CF_API_KEY)")
-    game_id = find_game_version_id(api("/game/versions", token), name)
+    versions = api("/game/versions", token)
+    matches = [v for v in versions if v.get("name") == name]
+    print(f"game versions named {name}: " + ", ".join(
+        f"id {v.get('id')} (type {v.get('gameVersionTypeID')}, slug {v.get('slug')})" for v in matches))
+    game_id = find_game_version_id(versions, name)
     meta = build_metadata(toc["version"], changelog, game_id)
+    print("metadata: " + json.dumps(meta, ensure_ascii=False))
     body, ctype = multipart(meta, zip_path)
     result = api(f"/projects/{toc['project_id']}/upload-file", token, body, ctype)
     print(f"uploaded {zip_path.name} as DeSync UI {toc['version']} (game version {name}): file id {result.get('id')}")
