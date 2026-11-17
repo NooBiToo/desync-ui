@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: LootRollInfo (diag)
+## Notes: Diagnostics for loot history API (who rolled what)
+## Author: local
+## Version: 0.1-diag
+## OptionalDeps: ElvUI
+## SavedVariables: LootRollInfoDB
+LootRollInfo.lua

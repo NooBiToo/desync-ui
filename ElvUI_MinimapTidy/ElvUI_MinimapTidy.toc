@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: ElvUI MinimapTidy
+## Notes: Moves minimap addon buttons into the Addon Compartment, settings in ElvUI
+## Author: local
+## Version: 1.4
+## OptionalDeps: ElvUI, ElvUI_MerathilisUI, LibDBIcon-1.0
+## SavedVariables: MinimapTidyDB
+MinimapTidy.lua
+Options.lua

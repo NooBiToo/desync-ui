@@ -1,0 +1,5 @@
+## Interface: 16001
+## Title: FishLog
+## Notes: Logs all events while fishing, to find a bobber-splash signal
+## SavedVariables: FishLogDB
+FishLog.lua

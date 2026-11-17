@@ -1,0 +1,12 @@
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+.venv/
+.superpowers/
+dist/
+backups/
+__pycache__/
+*.pyc
+docs/superpowers/
+tools/migrate_author.py
+tools/stopwords.local.txt

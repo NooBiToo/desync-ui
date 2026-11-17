@@ -1,0 +1,22 @@
+## Interface: 16001
+## Title: DeSync UI
+## Notes: Сборка интерфейса на ElvUI с WindTools и mMediaTag и полезными модулями
+## Author: DeSync
+## Version: 1.0.0
+## RequiredDeps: ElvUI, ElvUI_WindTools, ElvUI_mMediaTag
+## OptionalDeps: Questie, LibDBIcon-1.0
+## SavedVariables: DeSyncToolsDB
+## IconTexture: Interface\AddOns\ElvUI_DeSyncUI\Media\Logo
+Profile.lua
+Core.lua
+Modules\MinimapTidy.lua
+Modules\LootRoll.lua
+Modules\BankData.lua
+Modules\BankWindow.lua
+Modules\BankView.lua
+Modules\WandStopData.lua
+Modules\WandStop.lua
+Modules\TargetCountData.lua
+Modules\TargetCount.lua
+Modules\QuestieTipFix.lua
+Installer.lua

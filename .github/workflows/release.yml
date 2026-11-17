@@ -1,0 +1,41 @@
+name: Release to CurseForge
+
+# Push a tag like v1.0.1 (it must equal "## Version" in ElvUI_DeSyncUI/ElvUI_DeSyncUI.toc):
+# tests run, the zip is built with the personal-data check, and the file is uploaded to CurseForge.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the changelog is built from commits since the previous tag
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lupa (Lua 5.1 for the tests and tools)
+        run: python -m pip install lupa
+
+      - name: Tests
+        run: python tests/run.py
+
+      - name: Build the zip
+        run: python tools/build_release.py
+
+      - name: Upload to CurseForge
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+        run: python tools/curseforge_upload.py --tag "${GITHUB_REF_NAME}"
+
+      - name: GitHub release with the same zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" dist/ElvUI_DeSyncUI-*.zip --title "DeSync UI ${GITHUB_REF_NAME#v}" --generate-notes
