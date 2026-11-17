@@ -302,6 +302,56 @@ local function yn(v)
   return v and "да" or "нет"
 end
 
+-- diagnostics for dungeons: which other signal of "who hits which mob" the game leaves open
+local function show(v)
+  if isSecret(v) then return "?" end
+  if type(v) == "number" then return string.format("%.0f", v) end
+  return tostring(v)
+end
+
+local function call(fn, ...)
+  if not fn then return "нет API" end
+  local ok, a, b, c, d, e = pcall(fn, ...)
+  if not ok then return "ошибка" end
+  return a, b, c, d, e
+end
+
+-- harmful auras on the mob and whether their caster is readable (dots tell who hits the mob)
+local function auraSources(mob)
+  local get = C_UnitAuras and C_UnitAuras.GetAuraDataByIndex
+  if not get then return "нет API" end
+  local ok, res = pcall(function()
+    local n, open, from = 0, 0, {}
+    for i = 1, 40 do
+      local a = get(mob, i, "HARMFUL")
+      if not a then break end
+      n = n + 1
+      if issecrettable and issecrettable(a) then
+        from[#from + 1] = "таблица скрыта"
+      else
+        local su = a.sourceUnit
+        if su ~= nil and not isSecret(su) then open = open + 1; from[#from + 1] = su
+        else from[#from + 1] = isSecret(su) and "?" or "нет" end
+      end
+    end
+    return string.format("%d шт., автор открыт у %d (%s)", n, open, table.concat(from, ","))
+  end)
+  return ok and res or "ошибка"
+end
+
+-- combat log inside the instance: does it fire, are source and target readable
+local cleu = { reg = "не пробовали", events = 0, srcOpen = 0, dstOpen = 0 }
+local function onCombatLog()
+  if not inInstance() then return end
+  cleu.events = cleu.events + 1
+  local get = C_CombatLog and C_CombatLog.GetCurrentEventInfo or CombatLogGetCurrentEventInfo
+  if not get then cleu.err = "нет API"; return end
+  local ok, _, _, _, src, _, _, _, dst = pcall(get)
+  if not ok then cleu.err = "ошибка чтения"; return end
+  if src ~= nil and not isSecret(src) then cleu.srcOpen = cleu.srcOpen + 1 end
+  if dst ~= nil and not isSecret(dst) then cleu.dstOpen = cleu.dstOpen + 1 end
+end
+
 -- /dstwho: walk the chain plate -> group -> targets and say where it stops
 local function report()
   local lines = {}
@@ -349,6 +399,9 @@ local function report()
       not ok and "ошибка" or (plate and "есть" or "нет"),
       isSecret(guid) and "скрыт" or (guid and "есть" or "нет"),
       tokens[1] and yn(cmp) or "нет врагов", yn(hidden)))
+    -- what is left to match the target with a plate by its traits
+    say(string.format("    цель: имя %s, здоровье %s/%s, метка %s", isSecret(call(UnitName, target)) and "скрыто" or "открыто",
+      show(call(UnitHealth, target)), show(call(UnitHealthMax, target)), show(call(GetRaidTargetIndex, target))))
   end
   -- the other direction: whom each enemy targets, and the tank's threat on it (may stay open in dungeons)
   local tank
@@ -374,7 +427,19 @@ local function report()
         isSecret(s) and "скрыто" or tostring(s), isSecret(v) and "скрыто" or tostring(v))
     end
     say("    угроза: " .. table.concat(parts, " | "))
+    local det = {}
+    for _, m in ipairs(list) do
+      local tanking, st, sp, rp, v = call(UnitDetailedThreatSituation, m.unit, mob)
+      det[#det + 1] = string.format("%s %s/%s/%s/%s/%s lead=%s", m.unit, show(tanking), show(st), show(sp), show(rp),
+        show(v), show(call(UnitThreatPercentageOfLead, m.unit, mob)))
+    end
+    say("    подробно (танкует/статус/%/сырой %/угроза): " .. table.concat(det, " | "))
+    say(string.format("    моб: GUID %s, имя %s, здоровье %s/%s, метка %s, дебаффы: %s",
+      isSecret(call(UnitGUID, mob)) and "скрыт" or "открыт", isSecret(call(UnitName, mob)) and "скрыто" or "открыто",
+      show(call(UnitHealth, mob)), show(call(UnitHealthMax, mob)), show(call(GetRaidTargetIndex, mob)), auraSources(mob)))
   end
+  say(string.format("журнал боя в подземелье: подписка %s, событий %d, источник открыт %d, цель открыта %d%s",
+    cleu.reg, cleu.events, cleu.srcOpen, cleu.dstOpen, cleu.err and (", " .. cleu.err) or ""))
   say(string.format("иконки показаны: %d%s", shown, lastError and (", последняя ошибка: " .. lastError) or ""))
 end
 
@@ -396,6 +461,11 @@ function mod.OnEnable(db)
     pcall(f.RegisterEvent, f, e)
   end
   f:SetScript("OnEvent", function(...) safe(onEvent, ...) end)
+  -- diagnostics only: whether the combat log is open in dungeons (see /dstwho)
+  local log = CreateFrame("Frame")
+  local okLog, errLog = pcall(log.RegisterEvent, log, "COMBAT_LOG_EVENT_UNFILTERED")
+  cleu.reg = okLog and "есть" or ("ошибка: " .. tostring(errLog))
+  log:SetScript("OnEvent", function() pcall(onCombatLog) end)
   seed()
   schedule()
 

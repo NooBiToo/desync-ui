@@ -18,7 +18,11 @@ local function obj(parent)
     SetPoint = function(self, _, rel) self.anchor = rel end,
     ClearAllPoints = function(self) self.anchor = nil end,
     SetScript = function(self, k, fn) self.scripts[k] = fn end,
-    RegisterEvent = function(self, e) eventFrame = self; registered[e] = true end,
+    -- the module's main frame; the combat-log probe has a frame of its own
+    RegisterEvent = function(self, e)
+      if e ~= "COMBAT_LOG_EVENT_UNFILTERED" then eventFrame = self end
+      registered[e] = true
+    end,
     CreateTexture = function() return obj() end,
     CreateFontString = function() return obj() end,
   }
@@ -389,6 +393,16 @@ test("/dstwho also saves its report with the settings", function()
   local r = moddb.lastReport
   assert(type(r) == "table" and #r >= 4)
   assert(r[1]:find("в группе: да", 1, true) and table.concat(r, "\n"):find("party1", 1, true))
+end)
+
+test("/dstwho probes the other dungeon signals without breaking when the game hides them", function()
+  UnitDetailedThreatSituation = function() return false, 0, SECRET, SECRET, SECRET end
+  SlashCmdList.DSTWHO("")
+  local all = table.concat(moddb.lastReport, "\n")
+  assert(all:find("подробно (танкует/статус/%/сырой %/угроза): player false/0/?/?/?", 1, true), all)
+  assert(all:find("моб: GUID", 1, true) and all:find("цель: имя", 1, true))
+  assert(all:find("журнал боя в подземелье: подписка есть, событий 0", 1, true))
+  assert(moddb.lastError == nil, tostring(moddb.lastError))
 end)
 
 test("errors are kept with the settings for diagnosis; no per-update record is written", function()
