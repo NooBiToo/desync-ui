@@ -58,6 +58,17 @@ class MetadataTests(unittest.TestCase):
         slugs = {p["slug"]: p["type"] for p in m["relations"]["projects"]}
         self.assertEqual(slugs, {"elvui_windtools": "requiredDependency", "elvui_mmediatag": "requiredDependency"})
 
+    def test_metadata_without_relations_leaves_them_to_the_project_defaults(self):
+        m = cu.build_metadata("1.0.1", "- fix", 2, with_relations=False)
+        self.assertNotIn("relations", m)
+        self.assertEqual(m["gameVersions"], [2])
+
+    def test_a_refused_relation_slug_is_recognised(self):
+        body = '{"errorCode":1018,"errorMessage":"Invalid slug in project relations: \'elvui_windtools\' does not exist"}'
+        self.assertTrue(cu.CurseForgeError(400, body).bad_relations)
+        self.assertFalse(cu.CurseForgeError(400, '{"errorCode":1007,"errorMessage":"Invalid game version"}').bad_relations)
+        self.assertFalse(cu.CurseForgeError(500, "oops").bad_relations)
+
 
 if __name__ == "__main__":
     unittest.main()
