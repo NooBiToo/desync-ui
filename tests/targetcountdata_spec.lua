@@ -60,5 +60,33 @@ test("Count: a target that is not one of the enemy plates counts nothing", funct
   assert(res.nameplate1.count == 0 and res.nameplate9 == nil)
 end)
 
+-- threat[mob][unit] = threat situation (0..3) of a member on a mob; absent = not on its threat table
+local function threatFrom(threat)
+  return function(unit, mob) return threat[mob] and threat[mob][unit] end
+end
+
+test("CountThreat: members on the threat table, shield when the tank holds it, alert when it is loose", function()
+  local members = { { unit = "player" }, { unit = "party1", tank = true }, { unit = "party2" } }
+  local res = T.CountThreat({ "nameplate1", "nameplate2", "nameplate3" }, members, threatFrom({
+    nameplate1 = { player = 0, party1 = 3, party2 = 1 },
+    nameplate2 = { player = 3, party1 = 1 },
+  }))
+  assert(res.nameplate1.count == 3 and res.nameplate1.tank and not res.nameplate1.loose)
+  assert(res.nameplate2.count == 2 and not res.nameplate2.tank and res.nameplate2.loose)
+  assert(res.nameplate3.count == 0 and not res.nameplate3.tank and not res.nameplate3.loose)
+end)
+
+test("CountThreat: status 2 (tanking, about to lose it) still counts as holding", function()
+  local res = T.CountThreat({ "nameplate1" }, { { unit = "party1", tank = true }, { unit = "party2" } },
+    threatFrom({ nameplate1 = { party1 = 2, party2 = 1 } }))
+  assert(res.nameplate1.tank and not res.nameplate1.loose)
+end)
+
+test("CountThreat: without a known tank nobody is flagged as loose", function()
+  local res = T.CountThreat({ "nameplate1" }, { { unit = "player" }, { unit = "party1" } },
+    threatFrom({ nameplate1 = { player = 3, party1 = 0 } }))
+  assert(res.nameplate1.count == 2 and not res.nameplate1.tank and not res.nameplate1.loose)
+end)
+
 print(passed .. " passed, " .. failed .. " failed")
 if failed > 0 then error("tests failed") end

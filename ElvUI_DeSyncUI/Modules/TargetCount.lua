@@ -4,7 +4,8 @@ local mod = ns.NewModule("TargetCount", {
   desc = "В группе и рейде на индикаторах здоровья врагов (ElvUI) слева от полоски видно: "
       .. "меч с числом — сколько участников держат этого врага в цели (вы тоже считаетесь), "
       .. "щит — этого врага держит в цели танк. Танк — участник с ролью «Танк» или главный танк рейда. "
-      .. "Работает в открытом мире: в подземельях Forever игра скрывает от аддонов, кто кого выбрал в цель.",
+      .. "В подземельях игра скрывает цели, там счёт по угрозе: число — участники в бою с мобом, "
+      .. "щит — моб на танке, красный крест — моб сорвался с танка.",
 })
 
 local say = ns.say
@@ -13,7 +14,7 @@ local SIZE = 16
 
 local E, DB
 local pending, reported, warnedHidden, warnedNoTank = false, false, false, false
-local closedHere, warnedInstance = false, false  -- inside a dungeon that hides targets
+local warnedInstance = false  -- the threat-mode note was said in a dungeon
 local testMode, lastError = false, nil
 
 local function safe(fn, ...)
@@ -66,6 +67,11 @@ local function widget(uf)
   w.tank:SetTexCoord(2 / 64, 56 / 64, 2 / 64, 56 / 64)  -- same crop ElvUI uses for this icon
   w.tank:SetSize(SIZE, SIZE)
 
+  -- dungeons (threat mode): the mob broke loose from the tank
+  w.alert = w:CreateTexture(nil, "OVERLAY")
+  w.alert:SetTexture("Interface\\RaidFrame\\ReadyCheck-NotReady")
+  w.alert:SetSize(SIZE, SIZE)
+
   uf.dstTC = w
   return w
 end
@@ -105,14 +111,18 @@ local function paint(uf, r)
   w.sword:SetShown(hasCount)
   w.count:SetShown(hasCount)
   w.count:SetText(hasCount and r.count or "")
-  w.tank:ClearAllPoints()
-  if hasCount then
-    w.tank:SetPoint("RIGHT", w.sword, "LEFT", -2, 0)
-  else
-    w.tank:SetPoint("RIGHT", w, "RIGHT")
+  -- shield (on the tank) and alert (loose) take the same place, left of the sword
+  for _, icon in ipairs({ w.tank, w.alert }) do
+    icon:ClearAllPoints()
+    if hasCount then
+      icon:SetPoint("RIGHT", w.sword, "LEFT", -2, 0)
+    else
+      icon:SetPoint("RIGHT", w, "RIGHT")
+    end
   end
   w.tank:SetShown(r.tank)
-  w:SetShown(hasCount or r.tank)
+  w.alert:SetShown(r.loose and not r.tank or false)
+  w:SetShown(hasCount or r.tank or r.loose or false)
 end
 
 local function members()
@@ -194,8 +204,14 @@ local function inInstance()
   return notSecret(inside) and inside and true or false
 end
 
+-- threat situation 0..3 of a member on a mob, nil when not on its threat table (or hidden by the game)
+local function threatOf(unit, mob)
+  local s = UnitThreatSituation and UnitThreatSituation(unit, mob)
+  if isSecret(s) then return nil end
+  return s
+end
+
 function mod.Update()
-  if closedHere and not testMode then return end  -- this dungeon hides every target: nothing to count
   local inGroup = IsInGroup() or testMode
   local tokens, frames = {}, {}
   for _, e in ipairs(currentPlates()) do
@@ -221,22 +237,23 @@ function mod.Update()
     warnedNoTank = true
     say("TargetCount: в группе никто не отмечен танком (роль «Танк» или главный танк рейда), щит не показывается")
   end
-  local res, blocked = T.Count(tokens, list, makeLocate(tokens))
-  if blocked and inInstance() then
+  local res
+  if inInstance() then
     -- seen in game: inside Forever dungeons every member's target is secret (plate lookup, GUID and
-    -- comparison all refused), so stop until the next zone change instead of recounting on every event
-    closedHere = true
-    for _, uf in pairs(frames) do hide(uf) end
+    -- comparison all refused), but threat stays readable: count from the mobs' threat tables
+    res = T.CountThreat(tokens, list, threatOf)
     if not warnedInstance then
       warnedInstance = true
-      say("TargetCount: в подземельях Forever игра скрывает от аддонов, кто кого выбрал в цель, — "
-        .. "здесь счётчик не работает (в открытом мире работает)")
+      say("TargetCount: в подземельях игра скрывает цели, здесь счётчик по угрозе: число — участники в бою "
+        .. "с мобом, щит — моб на танке, красный крест — моб сорвался с танка")
     end
-    return
-  end
-  if blocked and not warnedHidden then
-    warnedHidden = true
-    say("TargetCount: игра скрывает цели участников группы, часть иконок не показывается")
+  else
+    local blocked
+    res, blocked = T.Count(tokens, list, makeLocate(tokens))
+    if blocked and not warnedHidden then
+      warnedHidden = true
+      say("TargetCount: игра скрывает цели участников группы, часть иконок не показывается")
+    end
   end
   for unit, uf in pairs(frames) do paint(uf, res[unit]) end
 end
@@ -263,11 +280,11 @@ local function onEvent(_, event, unit)
     local plate = plateFor(unit)  -- the frame gets reused for another unit: drop our icons now
     if plate and plate.unitFrame then hide(plate.unitFrame) end
   elseif event == "PLAYER_ENTERING_WORLD" then
-    closedHere = false  -- a new zone: maybe the open world again
     seed()
   end
   if event == "UNIT_TARGET" and not groupUnit(unit) then return end  -- mobs retarget all the time
-  if (event == "UNIT_FLAGS" or event == "UNIT_FACTION")
+  if (event == "UNIT_FLAGS" or event == "UNIT_FACTION"
+      or event == "UNIT_THREAT_LIST_UPDATE" or event == "UNIT_THREAT_SITUATION_UPDATE")
      and not (groupUnit(unit) or (type(unit) == "string" and unit:find("^nameplate%d"))) then
     return
   end
@@ -359,7 +376,8 @@ function mod.OnEnable(db)
   local f = CreateFrame("Frame")
   for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "GROUP_ROSTER_UPDATE", "PLAYER_ROLES_ASSIGNED", "PLAYER_TARGET_CHANGED",
                        "UNIT_TARGET", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "RAID_TARGET_UPDATE",
-                       "UNIT_FLAGS", "UNIT_FACTION", "PLAYER_REGEN_ENABLED" }) do
+                       "UNIT_FLAGS", "UNIT_FACTION", "PLAYER_REGEN_ENABLED",
+                       "UNIT_THREAT_LIST_UPDATE", "UNIT_THREAT_SITUATION_UPDATE" }) do
     pcall(f.RegisterEvent, f, e)
   end
   f:SetScript("OnEvent", function(...) safe(onEvent, ...) end)

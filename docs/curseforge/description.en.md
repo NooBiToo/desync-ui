@@ -8,7 +8,7 @@ An interface pack for **WoW Forever** built on ElvUI: a clean ElvUI look togethe
 
 - **ElvUI look.** The "DeSync UI" profile: bar and frame layout, unit frames, nameplates, PT Sans Narrow and Expressway fonts, WindTools and mMediaTag settings.
 - **Bank in your bag.** A button in the ElvUI bag shows what is in your bank, wherever you are. The bank is remembered on every visit to a banker, and you can browse the banks of all your characters.
-- **Who's hitting what.** In a party or raid, enemy nameplates show a sword with a number (how many group members are targeting that enemy) and a shield on the tank's target. Works in the open world: inside Forever dungeons the game hides everyone's target from addons.
+- **Who's hitting what.** In a party or raid, enemy nameplates show a sword with a number (how many group members are targeting that enemy) and a shield on the tank's target. Inside dungeons the game hides targets from addons, so there the counter works from threat: the number is how many group members are fighting that mob, the shield means the tank holds it, and a red cross means it broke loose from the tank.
 - **Quest progress in tooltips.** Fixes Questie's quest lines disappearing from mob tooltips.
 - **Who rolled what.** Counters and names on the Need / Greed / Pass buttons of the ElvUI loot roll frame.
 - **Wand doesn't block spells** (optional). Spell keys first stop your wand shot, then cast the spell. For mages, priests and warlocks.

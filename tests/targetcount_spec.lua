@@ -64,6 +64,7 @@ local function setup(opts)
   GetPartyAssignment = function() return false end
   C_Secrets = { CanCompareUnitTokens = function() return canCompare end }
   IsInInstance = function() return false end
+  UnitThreatSituation = function() return nil end
   issecretvalue = function(v) return v == SECRET end
   UnitExists = function(u)
     if u:find("^nameplate%d+$") then
@@ -288,24 +289,38 @@ test("/dstwho reports each step of the chain", function()
   assert(saidHas("party1") and saidHas("nameplate2") and saidHas("иконки показаны: 2"))
 end)
 
-test("inside a dungeon where the game hides every target: one clear message, no icons, no work until leaving", function()
+test("inside a dungeon the counter works from threat: members in combat, shield on the tank, alert when loose", function()
   IsInInstance = function() return true, "party" end
-  canCompare, plateLookup, guidOpen = false, false, false
-  fire("UNIT_TARGET", "party1"); flush()
-  assert(saidHas("подземельях") and not visible(1) and not visible(2))
-  local calls = 0
-  local compare = C_Secrets.CanCompareUnitTokens
-  C_Secrets.CanCompareUnitTokens = function(...) calls = calls + 1; return compare(...) end
-  fire("UNIT_TARGET", "party2"); flush()
-  assert(calls == 0, "kept working inside the dungeon: " .. calls)
+  canCompare, plateLookup, guidOpen = false, false, false  -- the game hides every target there
+  -- party1 is the tank (setup roles); nameplate1 is on the tank, nameplate2 broke loose onto the player
+  local threat = { nameplate1 = { player = 0, party1 = 3, party2 = 1 }, nameplate2 = { player = 3, party1 = 1 } }
+  UnitThreatSituation = function(u, mob) return threat[mob] and threat[mob][u] end
+  fire("UNIT_THREAT_LIST_UPDATE", "nameplate1"); flush()
+  assert(w(1).count.text == 3 and w(1).tank.shown and not w(1).alert.shown)
+  assert(w(2).count.text == 2 and not w(2).tank.shown and w(2).alert.shown)
+  assert(w(2).alert.texture == "Interface\\RaidFrame\\ReadyCheck-NotReady")
+  assert(not saidHas("скрывает цели участников"))  -- no "hidden targets" warning in threat mode
   local n = 0
-  for _, s in ipairs(said) do if s:find("подземельях", 1, true) then n = n + 1 end end
-  assert(n == 1)
-  -- back in the open world everything works again
+  for _, s in ipairs(said) do if s:find("угроз", 1, true) then n = n + 1 end end
+  fire("UNIT_THREAT_SITUATION_UPDATE", "party2"); flush()
+  for _, s in ipairs(said) do if s:find("угроз", 1, true) then n = n - 1 end end
+  assert(n == 0 and saidHas("угроз"), "the threat-mode note is said once")
+  -- a secret threat value counts as not on the table, without errors
+  UnitThreatSituation = function() return SECRET end
+  fire("UNIT_THREAT_LIST_UPDATE", "nameplate1"); flush()
+  assert(not visible(1) and not saidHas("ошибка"))
+  -- back in the open world: targets again
   IsInInstance = function() return false end
   canCompare, plateLookup, guidOpen = true, true, true
   fire("PLAYER_ENTERING_WORLD"); flush()
-  assert(visible(1) and w(1).count.text == 2)
+  assert(visible(1) and w(1).count.text == 2 and not w(1).alert.shown)
+end)
+
+test("threat changes on mobs and group members trigger a redraw; other units do not", function()
+  assert(registered.UNIT_THREAT_LIST_UPDATE and registered.UNIT_THREAT_SITUATION_UPDATE)
+  fire("UNIT_THREAT_LIST_UPDATE", "nameplate2"); assert(#timers == 1); flush()
+  fire("UNIT_THREAT_SITUATION_UPDATE", "party1"); assert(#timers == 1); flush()
+  fire("UNIT_THREAT_SITUATION_UPDATE", "target"); assert(#timers == 0)
 end)
 
 test("/dstwho shows each way of finding a target separately, and whether we are in an instance", function()
